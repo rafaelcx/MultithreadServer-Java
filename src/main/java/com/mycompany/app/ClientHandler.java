@@ -2,6 +2,8 @@ package com.mycompany.app;
 
 import java.io.*;
 import java.net.Socket;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.StringTokenizer;
 
 public class ClientHandler implements Runnable {
@@ -15,75 +17,87 @@ public class ClientHandler implements Runnable {
     }
 
     public void run() {
+        System.out.println("Incoming request...");
+        processRequest();
+    }
+
+    private void processRequest() {
         try {
-            System.out.println("Incoming request...");
-            processRequest();
-        } catch (Throwable $exception) {
-            System.out.println($exception.getMessage());
+            InputStream input_stream = client_socket.getInputStream();
+            DataOutputStream output_stream = new DataOutputStream(client_socket.getOutputStream());
+            BufferedReader buffered_reader = new BufferedReader(new InputStreamReader(input_stream));
+
+            HttpRequest request = buildHttpRequest(buffered_reader);
+            FileInputStream file = getRequestedFile(request);
+
+            if (file != null) {
+                handleSuccessfulRequest(output_stream, file);
+            } else {
+                handleNotFoundRequest(output_stream);
+            }
+
+            output_stream.close();
+            buffered_reader.close();
+            client_socket.close();
+
+        } catch (Exception exception) {
+            System.out.println("500 Internal Server Error");
         }
     }
 
-    private void processRequest() throws Exception {
-        InputStream is = client_socket.getInputStream();
-        DataOutputStream os = new DataOutputStream(client_socket.getOutputStream());
-        BufferedReader br = new BufferedReader(new InputStreamReader(is));
+    private void handleSuccessfulRequest(DataOutputStream os, FileInputStream file) throws Exception {
+        String status_line = "HTTP/1.0 200 OK" + CRLF;
+        String content_type_line = "Content-Type: text/html" + CRLF;
 
-        String requestLine = br.readLine();
-
-        StringTokenizer tokens = new StringTokenizer(requestLine);
-        tokens.nextToken();  // skip the method
-        String fileName = tokens.nextToken();
-
-        fileName = System.getProperty("user.dir") + "/src/main/java/com/mycompany/app/www" + fileName + ".html";
-
-        FileInputStream fis = null ;
-        boolean fileExists = true ;
-        try {
-            fis = new FileInputStream(fileName);
-        } catch (FileNotFoundException e) {
-            System.out.println(e.getMessage());
-            fileExists = false ;
-        }
-
-        // General info about the request that can be seen on the IO
-        System.out.println(requestLine);
-        String headerLine = null;
-        while ((headerLine = br.readLine()).length() != 0) {
-            System.out.println(headerLine);
-        }
-
-
-        String statusLine = null;
-        String contentTypeLine = null;
-        String entityBody = null;
-
-        if (fileExists) {
-            statusLine = "HTTP/1.0 200 OK" + CRLF;
-            contentTypeLine = "Content-Type: " +
-                    contentType(fileName) + CRLF;
-        } else {
-            statusLine = "HTTP/1.0 404 Not Found" + CRLF;
-            contentTypeLine = "Content-Type: text/html" + CRLF;
-            entityBody = "<HTML>" +
-                    "<HEAD><TITLE>Not Found</TITLE></HEAD>" +
-                    "<BODY>Not Found</BODY></HTML>";
-        }
-
-        os.writeBytes(statusLine);
-        os.writeBytes(contentTypeLine);
+        os.writeBytes(status_line);
+        os.writeBytes(content_type_line);
         os.writeBytes(CRLF);
+        sendBytes(file, os);
 
-        // Send the entity body.
-        if (fileExists) {
-            sendBytes(fis, os);
-            fis.close();
-        } else {
-            os.writeBytes(entityBody) ;
+        file.close();
+    }
+
+    private void handleNotFoundRequest(DataOutputStream os) throws Exception {
+        String status_line = "HTTP/1.0 404 Not Found" + CRLF;
+        String content_type_line = "Content-Type: text/html" + CRLF;
+        String entity_body = "<HTML>" + "<HEAD><TITLE>Not Found</TITLE></HEAD>" + "<BODY>Not Found</BODY></HTML>";
+
+        os.writeBytes(status_line);
+        os.writeBytes(content_type_line);
+        os.writeBytes(CRLF);
+        os.writeBytes(entity_body);
+    }
+
+    private HttpRequest buildHttpRequest(BufferedReader br) throws Exception {
+        String request_line = br.readLine();
+        StringTokenizer tokens = new StringTokenizer(request_line);
+
+        String method = tokens.nextToken();
+        String file_path = System.getProperty("user.dir") + "/src/main/java/com/mycompany/app/www" + tokens.nextToken() + ".html";
+
+        String header_line;
+        List<String> headers = new ArrayList<String>();
+        while ((header_line = br.readLine()).length() != 0) {
+            headers.add(header_line);
         }
 
-        os.close();
-        br.close();
-        client_socket.close();
+        logRequestInfo(headers);
+        return new HttpRequest(method, file_path, headers);
+    }
+
+    private FileInputStream getRequestedFile(HttpRequest request) {
+        try {
+            return new FileInputStream(request.getFilePath());
+        } catch (FileNotFoundException e) {
+            return null;
+        }
+    }
+
+    private void logRequestInfo(List headers) {
+        for (int i = 0; i < headers.size(); i++) {
+            System.out.println(headers.get(i));
+        }
+        System.out.println("\n\n");
     }
 
     private static void sendBytes(FileInputStream fis, OutputStream os) throws Exception {
@@ -93,14 +107,6 @@ public class ClientHandler implements Runnable {
         while ((bytes = fis.read(buffer)) != -1) {
             os.write(buffer, 0, bytes);
         }
-    }
-
-    private static String contentType(String fileName) {
-        if(fileName.endsWith(".htm") || fileName.endsWith(".html")) {
-            return "text/html";
-        }
-
-        return "application/octet-stream" ;
     }
 
 }
