@@ -12,8 +12,8 @@ public class ClientHandler implements Runnable {
 
     private Socket client_socket;
 
-    ClientHandler(Socket clientSocket) {
-        this.client_socket = clientSocket;
+    ClientHandler(Socket client_socket) {
+        this.client_socket = client_socket;
     }
 
     public void run() {
@@ -28,13 +28,7 @@ public class ClientHandler implements Runnable {
             BufferedReader buffered_reader = new BufferedReader(new InputStreamReader(input_stream));
 
             HttpRequest request = buildHttpRequest(buffered_reader);
-            FileInputStream file = getRequestedFile(request);
-
-            if (file != null) {
-                handleSuccessfulRequest(output_stream, file);
-            } else {
-                handleNotFoundRequest(output_stream);
-            }
+            handleRequest(request,output_stream);
 
             output_stream.close();
             buffered_reader.close();
@@ -45,27 +39,25 @@ public class ClientHandler implements Runnable {
         }
     }
 
-    private void handleSuccessfulRequest(DataOutputStream os, FileInputStream file) throws Exception {
-        String status_line = "HTTP/1.0 200 OK" + CRLF;
+    private void handleRequest(HttpRequest request, DataOutputStream os) throws Exception {
+        FileInputStream file;
+        String status_line;
+
+        try {
+            status_line = "HTTP/1.0 200 OK" + CRLF;
+            file = new FileInputStream(request.getFilePath());
+        } catch (FileNotFoundException e) {
+            status_line = "HTTP/1.0 404 Not Found" + CRLF;
+            file = new FileInputStream(System.getProperty("user.dir") + "/src/main/java/com/mycompany/app/www/not_found.html");
+        }
+
         String content_type_line = "Content-Type: text/html" + CRLF;
 
         os.writeBytes(status_line);
         os.writeBytes(content_type_line);
         os.writeBytes(CRLF);
         sendBytes(file, os);
-
         file.close();
-    }
-
-    private void handleNotFoundRequest(DataOutputStream os) throws Exception {
-        String status_line = "HTTP/1.0 404 Not Found" + CRLF;
-        String content_type_line = "Content-Type: text/html" + CRLF;
-        String entity_body = "<HTML>" + "<HEAD><TITLE>Not Found</TITLE></HEAD>" + "<BODY>Not Found</BODY></HTML>";
-
-        os.writeBytes(status_line);
-        os.writeBytes(content_type_line);
-        os.writeBytes(CRLF);
-        os.writeBytes(entity_body);
     }
 
     private HttpRequest buildHttpRequest(BufferedReader br) throws Exception {
@@ -83,14 +75,6 @@ public class ClientHandler implements Runnable {
 
         logRequestInfo(headers);
         return new HttpRequest(method, file_path, headers);
-    }
-
-    private FileInputStream getRequestedFile(HttpRequest request) {
-        try {
-            return new FileInputStream(request.getFilePath());
-        } catch (FileNotFoundException e) {
-            return null;
-        }
     }
 
     private void logRequestInfo(List headers) {
