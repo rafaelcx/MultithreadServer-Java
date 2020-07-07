@@ -36,6 +36,7 @@ public class ClientHandler implements Runnable {
 
         } catch (Exception exception) {
             System.out.println("500 Internal Server Error");
+            System.out.println(exception.getMessage());
         }
     }
 
