@@ -65,7 +65,10 @@ public class ClientHandler implements Runnable {
         StringTokenizer tokens = new StringTokenizer(request_line);
 
         String method = tokens.nextToken();
-        String file_path = System.getProperty("user.dir") + "/src/main/java/com/mycompany/app/www" + tokens.nextToken() + ".html";
+
+        String request_path = tokens.nextToken();
+        request_path = request_path.equals("/") ? "/index" : request_path;
+        String qualified_file_path = System.getProperty("user.dir") + "/src/main/java/com/mycompany/app/www" + request_path + ".html";
 
         String header_line;
         List<String> headers = new ArrayList<String>();
@@ -73,11 +76,12 @@ public class ClientHandler implements Runnable {
             headers.add(header_line);
         }
 
-        logRequestInfo(headers);
-        return new HttpRequest(method, file_path, headers);
+        logRequestInfo(request_path, headers);
+        return new HttpRequest(method, qualified_file_path, headers);
     }
 
-    private void logRequestInfo(List headers) {
+    private void logRequestInfo(String request_path, List headers) {
+        System.out.println("Path: " + request_path);
         for (int i = 0; i < headers.size(); i++) {
             System.out.println(headers.get(i));
         }
