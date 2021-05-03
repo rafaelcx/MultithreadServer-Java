@@ -6,11 +6,13 @@ public class HttpRequest {
 
     private String method;
     private String file_path;
+    private String content_type;
     private List headers;
 
-    HttpRequest(String method, String file_path, List headers) {
+    HttpRequest(String method, String file_path, String content_type, List headers) {
         this.method = method;
         this.file_path = file_path;
+        this.content_type = content_type;
         this.headers = headers;
     }
 
@@ -20,6 +22,10 @@ public class HttpRequest {
 
     public String getFilePath() {
         return this.file_path;
+    }
+
+    public String getContentType() {
+        return this.content_type;
     }
 
     public List getHeaders() {

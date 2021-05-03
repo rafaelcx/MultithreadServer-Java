@@ -28,7 +28,7 @@ public class ClientHandler implements Runnable {
             BufferedReader buffered_reader = new BufferedReader(new InputStreamReader(input_stream));
 
             HttpRequest request = buildHttpRequest(buffered_reader);
-            handleRequest(request,output_stream);
+            handleRequest(request, output_stream);
 
             output_stream.close();
             buffered_reader.close();
@@ -52,7 +52,7 @@ public class ClientHandler implements Runnable {
             file = new FileInputStream(System.getProperty("user.dir") + "/src/main/java/com/mycompany/app/www/not_found.html");
         }
 
-        String content_type_line = "Content-Type: text/html" + CRLF;
+        String content_type_line = "Content-Type: " + request.getContentType() + CRLF;
 
         os.writeBytes(status_line);
         os.writeBytes(content_type_line);
@@ -68,8 +68,10 @@ public class ClientHandler implements Runnable {
         String method = tokens.nextToken();
 
         String request_path = tokens.nextToken();
-        request_path = request_path.equals("/") ? "/index" : request_path;
-        String qualified_file_path = System.getProperty("user.dir") + "/src/main/java/com/mycompany/app/www" + request_path + ".html";
+        request_path = request_path.equals("/") ? "/index.html" : request_path;
+        String qualified_file_path = System.getProperty("user.dir") + "/src/main/java/com/mycompany/app/www" + request_path;
+
+        String content_type = getContentType(request_path);
 
         String header_line;
         List<String> headers = new ArrayList<String>();
@@ -78,7 +80,7 @@ public class ClientHandler implements Runnable {
         }
 
         logRequestInfo(request_path, headers);
-        return new HttpRequest(method, qualified_file_path, headers);
+        return new HttpRequest(method, qualified_file_path, content_type, headers);
     }
 
     private void logRequestInfo(String request_path, List headers) {
@@ -87,6 +89,22 @@ public class ClientHandler implements Runnable {
             System.out.println(headers.get(i));
         }
         System.out.println("\n\n");
+    }
+
+    private static String getContentType(String fileName) {
+        if(fileName.endsWith(".htm") || fileName.endsWith(".html")) {
+            return "text/html";
+        }
+
+        if(fileName.endsWith(".jpeg") || fileName.endsWith(".jpg")) {
+            return "image/jpeg ";
+        }
+
+        if(fileName.endsWith(".gif")) {
+            return "image/gif";
+        }
+
+        return "application/octet-stream";
     }
 
     private static void sendBytes(FileInputStream fis, OutputStream os) throws Exception {
